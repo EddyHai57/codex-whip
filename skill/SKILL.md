@@ -82,6 +82,7 @@ Runtime notes:
 - Do not run `--resume` while the user is actively typing inside that same interactive session.
 - `--resume` pins `sandbox_mode="workspace-write"` (unless `--yolo`) and ignores `--worktree`, reusing the recorded workdir.
 - Live monitoring: users can watch raw Codex logs in a side terminal via `tail -F /tmp/codex-whip-latest.log` (macOS/Linux) or `Get-Content "$env:TEMP\codex-whip-latest.log" -Wait` (Windows).
+- Concurrent runs (several Claude Code / Antigravity sessions) are safe: ledger writes take a lock. The `latest` link then points at whichever run started last, so tail the per-run `codex_log` path instead.
 - Forward any user-attached images directly via repeatable `--image <path>` flags.
 - `run_codex.sh` prints `codex_duration_sec` and `codex_tokens` on every run for cost visibility.
 

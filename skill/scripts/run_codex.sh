@@ -23,6 +23,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCHEMA_PATH="${SCRIPT_DIR}/../resources/result.schema.json"
 STATE_DIR="${CODEX_WHIP_HOME:-$HOME/.codex-whip}"
 LEDGER_PATH="${STATE_DIR}/sessions.tsv"
+LEDGER_LOCK="${STATE_DIR}/.sessions.lock"
 LATEST_LOG_LINK="/tmp/codex-whip-latest.log"
 
 WORKDIR="$(pwd)"
@@ -143,13 +144,38 @@ PY
   return 0
 }
 
-ledger_remove() {
+# Several Claude Code / Antigravity sessions may share one ledger, so writes take a
+# mkdir lock (atomic on every POSIX filesystem; macOS ships no flock).
+ledger_lock() {
+  mkdir -p "$STATE_DIR"
+  local i=0
+  until mkdir "$LEDGER_LOCK" 2>/dev/null; do
+    i=$((i + 1))
+    if [[ "$i" -ge 100 ]]; then
+      echo "Error: ledger lock busy for 10s: ${LEDGER_LOCK} (remove it if no codex-whip run is active)." >&2
+      return 1
+    fi
+    sleep 0.1
+  done
+}
+
+ledger_unlock() {
+  rmdir "$LEDGER_LOCK" 2>/dev/null || true
+}
+
+ledger_remove_unlocked() {
   local target_id="$1"
   [[ -f "$LEDGER_PATH" ]] || return 0
   local tmp_file
-  tmp_file="$(mktemp /tmp/codex-whip-ledger.XXXXXX)"
+  tmp_file="$(mktemp "${STATE_DIR}/.sessions.XXXXXX")"
   awk -F'\t' -v id="$target_id" '$2 != id' "$LEDGER_PATH" > "$tmp_file" || true
   mv "$tmp_file" "$LEDGER_PATH"
+}
+
+ledger_remove() {
+  ledger_lock || return 1
+  ledger_remove_unlocked "$1" || { ledger_unlock; return 1; }
+  ledger_unlock
 }
 
 ledger_add() {
@@ -158,10 +184,11 @@ ledger_add() {
   local mode="$3"
   local note="$4"
   [[ -n "$sid" ]] || return 0
-  mkdir -p "$STATE_DIR"
   note="$(printf '%s' "$note" | tr '\t\r\n' '   ')"
-  ledger_remove "$sid"
-  printf '%s\t%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$sid" "$wdir" "$mode" "$note" >> "$LEDGER_PATH"
+  ledger_lock || return 1
+  ledger_remove_unlocked "$sid" || { ledger_unlock; return 1; }
+  printf '%s\t%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$sid" "$wdir" "$mode" "$note" >> "$LEDGER_PATH" || { ledger_unlock; return 1; }
+  ledger_unlock
 }
 
 while [[ $# -gt 0 ]]; do
@@ -311,7 +338,8 @@ fi
 RUN_DIR="$(mktemp -d /tmp/codex-whip.XXXXXX)"
 LOG_FILE="${RUN_DIR}/raw.log"
 touch "$LOG_FILE"
-ln -sfn "$LOG_FILE" "$LATEST_LOG_LINK"
+# Shared convenience link for `tail -F`; concurrent runs race on it, so never let it abort a run.
+ln -sfn "$LOG_FILE" "$LATEST_LOG_LINK" 2>/dev/null || true
 
 if [[ -z "$OUT_FILE" ]]; then
   OUT_FILE="${RUN_DIR}/result.json"
