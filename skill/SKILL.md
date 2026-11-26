@@ -54,7 +54,20 @@ Write the brief to a temporary file (e.g. `/tmp/codex-brief.md` or `$env:TEMP\co
 4. **Verification**: exact test/check commands Codex must execute and report in `checks`.
 5. **Output rule**: concise, factual, strictly matching `resources/result.schema.json` — zero filler.
 
-## 5. Invoking & Opening Interactively
+## 5. Invoking, Foreground vs. Background & Opening Interactively
+
+### Foreground vs. Background Dispatch
+
+Choose dispatch mode so the user never sits idle unnecessarily:
+
+- **Foreground (blocking)**: use for quick lookups or when the very next reply strictly depends on Codex's result (e.g., Antigravity `WaitMsBeforeAsync: 10000`).
+- **Background (non-blocking — keep discussing!)**: use whenever the user says to run Codex in the background, or for heavy/long tasks (large codebase reads, block implementation, independent reviews) that don't block the current discussion:
+  - Launch `run_codex.sh` / `run_codex.ps1` using the **host tool's native backgrounding** (Antigravity: `WaitMsBeforeAsync: 500`; Claude Code: `run_in_background: true`). **Never** use shell `&` / `nohup` so automatic completion notifications stay intact.
+  - Immediately reply with a 1–2 line confirmation (task label/model + live log hint) and end your turn so the user can keep discussing with you without waiting.
+  - When the completion notification arrives, run the Verification Gate (§6) and report the verified outcome.
+- **Two mandatory background guardrails**:
+  1. **Isolate background writes**: if Codex edits files in the background while the foreground conversation may also modify the repo, pass `--worktree` (for Git repos) or scope it to disjoint files to prevent overwrite conflicts. Background read-only analysis/reviews have zero conflict risk.
+  2. **No concurrent `--resume` on the same session**: never dispatch a second `--resume` to a `--label` / UUID that already has a background run in flight; start a separate session if parallel runs are needed.
 
 ```bash
 # Start a named milestone session (images optional, repeatable)

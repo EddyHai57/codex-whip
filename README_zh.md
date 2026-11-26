@@ -44,6 +44,7 @@ flowchart LR
   - 单次任务 / 独立 Review 默认 `--ephemeral`，零历史残留；
   - 里程碑任务 `--persist --label <名称>`，支持按名精确/唯一模糊续跑（自动恢复原目录），验完 `--delete <名称>` 或 `--cleanup-all` 一键清空。
 - **大改动隔离（`--worktree`）**：自动开启 `--persist` 并吐出 `codex_workdir`，改在独立 Git worktree 里，主 Agent 审完 diff 再合回主工作区。
+- **前台同步 vs 后台异步派活**：短任务同步等结果；长任务（读大仓库、成块写代码、独立审查）走宿主原生后台模式（Antigravity `WaitMsBeforeAsync: 500` / Claude Code `run_in_background`），立刻把对话权还给你继续讨论，跑完自动通知验收；后台写代码配套 `--worktree` 防止与前台冲突。
 - **封顶 2 轮独立 Review**：强制全新无状态 `sol` 审 diff，只报 Blocker/Major 缺陷，最多 2 轮，防鸡蛋里挑骨头循环。
 - **内置护栏与成本观测**：进程组级 `--timeout`（默认 `570s`，低于 Claude Code 前台 Bash 的 600 秒上限；超时退出码 `124`）、每次自动汇报 `codex_duration_sec` 和 `codex_tokens`、支持多张 `--image` 原图直传、一键弹出终端接管交互（`open_codex.sh` / `open_codex.ps1`）。
 - **全平台支持**：macOS / Linux（Bash + Python 3）与 Windows（PowerShell，UTF-8 无乱码，免管理员权限目录联接安装）。
@@ -98,6 +99,7 @@ cd codex-whip
 - **按名续跑（跨对话 / 跨工具通用）**：*「接着 `billing-v2` 那个 codex 会话，按我们刚聊的方案动手改。」*
 - **发图找 Astra 查硬骨头**：*「把这张报错截图发给 astra（`xhigh`），定位一下根因。」*
 - **大重构隔离**：*「用 `--worktree` 让 codex 重构数据链路，你先帮我看 diff 再决定合不合。」*
+- **后台异步不中断讨论**：*「把这个重构扔后台让 codex 带着 `--worktree` 去跑，咱们别等它，继续聊下一个模块的设计。」*
 - **亲自接管终端**：*「帮我在终端里打开 `billing-v2` 那个 codex 对话。」*
 - **里程碑收尾清理**：*「这块验完了，把 `billing-v2` 删掉」* 或 *「清理所有未删的 codex 会话。」*
 

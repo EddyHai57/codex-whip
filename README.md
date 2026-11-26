@@ -44,6 +44,7 @@ flowchart LR
   - One-off tasks & reviews run `--ephemeral` (zero history clutter).
   - Milestones run `--persist --label <name>`, resume by name/UUID (auto-restoring workdir), and clean up via `--delete <name>` or `--cleanup-all`.
 - **Safe Isolation (`--worktree`)**: Automatically implies `--persist` and prints `codex_workdir` so your main agent can audit `git diff` in an isolated worktree before touching your working tree.
+- **Foreground vs. Background Dispatch**: Run quick tasks synchronously, or fire long coding/research/review jobs in native background mode (Antigravity `WaitMsBeforeAsync: 500` / Claude Code `run_in_background`) so you can keep discussing with your main agent without waiting — with automatic `--worktree` isolation for background writes.
 - **Capped 2-Round Independent Review**: Fresh ephemeral `sol` reviewer, Blocker/Major findings only, hard cap at 2 rounds to stop nitpick loops.
 - **Built-in Guardrails & Telemetry**: Process-group `--timeout` (default `570s`, under Claude Code's 600 s Bash cap; exit `124`), `codex_duration_sec` & `codex_tokens` per run, repeatable `--image` forwarding, and one-command interactive takeover (`open_codex.sh` / `open_codex.ps1`).
 - **Cross-Platform**: macOS / Linux (`bash` + `python3`) and Windows (`PowerShell`, UTF-8 clean, non-admin Junction install).
@@ -98,6 +99,7 @@ Once installed, just talk naturally in Antigravity or Claude Code:
 - **Resume by name (even in a new chat or the other tool)**: *"Continue the `billing-v2` Codex session and implement the retry logic we agreed on."*
 - **Heavy debugging with Astra + screenshot**: *"Send this screenshot to Astra (`xhigh`) and find why the chart layout breaks."*
 - **Isolated refactor**: *"Run Codex in a `--worktree` to refactor the data pipeline; inspect the diff before merging."*
+- **Non-blocking background offload**: *"Kick this refactor to Codex in the background (use `--worktree`) and let's keep designing the next module while it runs."*
 - **Take over interactively**: *"Open the `billing-v2` Codex session in Terminal."*
 - **Clean up**: *"Milestone verified — delete `billing-v2`"* or *"Clean up all tracked Codex sessions."*
 
