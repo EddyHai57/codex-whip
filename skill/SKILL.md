@@ -27,7 +27,8 @@ Invoke the fixed script path directly (avoid `$()` or chained shell wrappers so 
 - **Hard tasks**: `--model astra --effort high` (or `xhigh`) (`gpt-6.2-astra`) — complex multi-file debugging, deep root-cause analysis, tricky architecture/algorithms.
 - **Sandbox**: defaults to `-s workspace-write` (non-interactive, no approval prompts). Only add `--yolo` when cross-directory writes or network package installs are explicitly needed.
 - **Worktree isolation (`--worktree`)**: for large/risky refactors or parallel edits inside a Git repo, pass `--worktree` (implies `--persist`). Codex edits an isolated managed Git worktree; inspect `git -C <codex_workdir> diff` before landing changes, then clean up with `--delete`.
-- **Timeout (`--timeout <sec>`)**: defaults to `600` seconds (exits `124` on timeout and kills the process group cleanly). Pass `0` to disable or a higher value for long builds.
+- **Timeout (`--timeout <sec>`)**: defaults to `570` seconds (exits `124` on timeout and kills the process group cleanly). Pass `0` to disable or a higher value for long builds.
+- **Claude Code 600 s cap**: a foreground Bash call is killed at 600 s, possibly before the wrapper prints its receipt (Codex runs in its own process group and may keep running). For tasks expected to exceed ~9 minutes, invoke with `run_in_background` and pass a larger `--timeout`.
 
 ## 3. Session Lifecycle, Named Ledger & Cleanup
 
@@ -38,7 +39,7 @@ State is stored outside the repo in `~/.codex-whip/sessions.tsv` (shared automat
 - **Same-milestone follow-up (`--resume <uuid|name>`)**: pass either the UUID or the ledger label (never `--last`). Exact label match runs first, then unique substring match (failing with candidates on ambiguity), and recorded `workdir` is auto-restored if `--cd` is omitted.
 - **Finding a session by name**: if the user references a prior Codex task by name or topic, run `--list-sessions` if unsure, or pass the name directly to `--resume <name>`, `open_codex.sh --session <name>`, or `--delete <name>`.
 - **Milestone close / Reset**: once verified and done (or if Codex loops twice and needs a clean reset), delete the session so Codex history never bloats:
-  - Delete one: `run_codex.sh --delete <uuid|name>` (or `--archive <uuid|name>`)
+  - Delete one: `run_codex.sh --delete <uuid|label>` (or `--archive <uuid|label>`). Destructive ops accept only a UUID or an **exact** label, never a substring.
   - Inspect leftovers: `run_codex.sh --list-sessions`
   - Clean all tracked: `run_codex.sh --cleanup-all`
 
@@ -79,6 +80,7 @@ open_codex.sh --session "feature-x"
 
 Runtime notes:
 - Do not run `--resume` while the user is actively typing inside that same interactive session.
+- `--resume` pins `sandbox_mode="workspace-write"` (unless `--yolo`) and ignores `--worktree`, reusing the recorded workdir.
 - Live monitoring: users can watch raw Codex logs in a side terminal via `tail -F /tmp/codex-whip-latest.log` (macOS/Linux) or `Get-Content "$env:TEMP\codex-whip-latest.log" -Wait` (Windows).
 - Forward any user-attached images directly via repeatable `--image <path>` flags.
 - `run_codex.sh` prints `codex_duration_sec` and `codex_tokens` on every run for cost visibility.

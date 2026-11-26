@@ -29,7 +29,7 @@ WORKDIR="$(pwd)"
 WORKDIR_EXPLICIT=0
 MODEL="${CODEX_WHIP_DEFAULT_MODEL:-gpt-6.2-sol}"
 EFFORT="${CODEX_WHIP_DEFAULT_EFFORT:-high}"
-TIMEOUT_SEC="${CODEX_WHIP_TIMEOUT:-600}"
+TIMEOUT_SEC="${CODEX_WHIP_TIMEOUT:-570}"
 YOLO=0
 WORKTREE=0
 PERSIST=0
@@ -50,16 +50,16 @@ Usage: run_codex.sh [OPTIONS]
   --cd <dir>                Working directory for Codex (default: current dir; auto-restored on named resume)
   --model <name>            sol | astra | exact model id (default: gpt-6.2-sol)
   --effort <level>          low | medium | high | xhigh (default: high)
-  --timeout <sec>           Kill run after N seconds, exit 124 (default: 600; 0 = no limit)
+  --timeout <sec>           Kill run after N seconds, exit 124 (default: 570, under Claude Code's 600 s Bash cap; 0 = no limit)
   --prompt <text>           Inline prompt text
   --prompt-file <path>      Read prompt from file (preferred for structured briefs)
   --image <path>            Attach an image file (repeatable)
   --out <path>              Write final JSON message to this path
   --persist                 Persist session so it can be resumed within the same milestone
   --label <name>            Human-readable name recorded in sessions.tsv for persisted sessions
-  --resume <uuid|name>      Resume an existing persisted session by UUID or ledger label name
-  --delete <uuid|name>      Permanently delete a saved Codex session by UUID or ledger label name
-  --archive <uuid|name>     Archive a saved Codex session by UUID or ledger label name
+  --resume <uuid|name>      Resume an existing persisted session by UUID or ledger label (exact, then unique substring)
+  --delete <uuid|name>      Permanently delete a saved Codex session by UUID or exact ledger label
+  --archive <uuid|name>     Archive a saved Codex session by UUID or exact ledger label
   --list-sessions           List active persisted sessions tracked in sessions.tsv
   --cleanup-all             Delete all persisted sessions tracked in sessions.tsv
   --worktree                Run in an isolated managed Git worktree (implies --persist)
@@ -71,7 +71,7 @@ Environment variables:
   CODEX_WHIP_HOME           Directory for sessions.tsv ledger (default: ~/.codex-whip)
   CODEX_WHIP_DEFAULT_MODEL  Default model id (default: gpt-6.2-sol)
   CODEX_WHIP_DEFAULT_EFFORT Default reasoning effort (default: high)
-  CODEX_WHIP_TIMEOUT        Default timeout in seconds (default: 600)
+  CODEX_WHIP_TIMEOUT        Default timeout in seconds (default: 570)
 EOF
 }
 
@@ -82,6 +82,7 @@ is_uuid() {
 resolve_session_ref() {
   local ref="$1"
   local require_uuid="${2:-0}"
+  local exact_only="${3:-0}"
 
   if is_uuid "$ref"; then
     local rec_dir=""
@@ -94,9 +95,9 @@ resolve_session_ref() {
 
   if [[ -s "$LEDGER_PATH" ]]; then
     local matches
-    matches="$(python3 - "$LEDGER_PATH" "$ref" <<'PY'
+    matches="$(python3 - "$LEDGER_PATH" "$ref" "$exact_only" <<'PY'
 import sys
-ledger_path, query = sys.argv[1], sys.argv[2].strip().lower()
+ledger_path, query, exact_only = sys.argv[1], sys.argv[2].strip().lower(), sys.argv[3] == "1"
 rows = []
 with open(ledger_path, "r", encoding="utf-8") as f:
     for line in f:
@@ -108,7 +109,7 @@ with open(ledger_path, "r", encoding="utf-8") as f:
             rows.append(parts)
 
 exact = [r for r in rows if r[4].strip().lower() == query]
-chosen = exact if exact else [r for r in rows if query in r[4].strip().lower()]
+chosen = exact if (exact or exact_only) else [r for r in rows if query in r[4].strip().lower()]
 
 if len(chosen) == 1:
     print(f"OK\t{chosen[0][1]}\t{chosen[0][2]}")
@@ -134,7 +135,7 @@ PY
   fi
 
   if [[ "$require_uuid" -eq 1 ]]; then
-    echo "Error: session '${ref}' not found in ${LEDGER_PATH} (codex delete --force requires a UUID)." >&2
+    echo "Error: no UUID or exact label '${ref}' in ${LEDGER_PATH}; delete accepts only a UUID or an exact label." >&2
     return 2
   fi
 
@@ -247,7 +248,7 @@ if [[ "$CLEANUP_ALL" -eq 1 ]]; then
 fi
 
 if [[ -n "$DELETE_REF" ]]; then
-  RESOLVED="$(resolve_session_ref "$DELETE_REF" 1)"
+  RESOLVED="$(resolve_session_ref "$DELETE_REF" 1 1)"
   DELETE_ID="${RESOLVED%%$'\t'*}"
   "$CODEX_BIN" delete --force "$DELETE_ID"
   ledger_remove "$DELETE_ID"
@@ -255,7 +256,7 @@ if [[ -n "$DELETE_REF" ]]; then
 fi
 
 if [[ -n "$ARCHIVE_REF" ]]; then
-  RESOLVED="$(resolve_session_ref "$ARCHIVE_REF" 0)"
+  RESOLVED="$(resolve_session_ref "$ARCHIVE_REF" 0 1)"
   ARCHIVE_ID="${RESOLVED%%$'\t'*}"
   "$CODEX_BIN" archive "$ARCHIVE_ID"
   ledger_remove "$ARCHIVE_ID"
@@ -300,6 +301,11 @@ if [[ -n "$RESUME_REF" ]]; then
   if [[ "$WORKDIR_EXPLICIT" -eq 0 && -n "$RECORDED_DIR" && -d "$RECORDED_DIR" ]]; then
     WORKDIR="$RECORDED_DIR"
   fi
+  if [[ "$WORKTREE" -eq 1 ]]; then
+    # `codex exec resume --worktree` would create a NEW worktree; reuse the recorded workdir instead.
+    echo "Warning: --worktree is ignored with --resume; the recorded workdir is reused." >&2
+    WORKTREE=0
+  fi
 fi
 
 RUN_DIR="$(mktemp -d /tmp/codex-whip.XXXXXX)"
@@ -323,11 +329,11 @@ if [[ -n "$RESUME_ID" ]]; then
   for img in "${IMAGES[@]+"${IMAGES[@]}"}"; do
     CMD+=(-i "$img")
   done
-  if [[ "$WORKTREE" -eq 1 ]]; then
-    CMD+=(--worktree)
-  fi
   if [[ "$YOLO" -eq 1 ]]; then
     CMD+=(--dangerously-bypass-approvals-and-sandbox)
+  else
+    # `codex exec resume` has no -s flag; pin the sandbox via config so it matches the original run.
+    CMD+=(-c 'sandbox_mode="workspace-write"')
   fi
   CMD+=("$RESUME_ID" "$PROMPT")
 else
@@ -404,6 +410,9 @@ fi
 CODEX_WORKDIR="$(grep -m1 '^workdir:' "$LOG_FILE" | sed 's/^workdir:[[:space:]]*//' | tr -d '\r' || true)"
 TOKENS_USED="$(awk '/^tokens used$/{if (getline > 0) { gsub(/^[ \t\r]+|[ \t\r]+$/, ""); print; exit }}' "$LOG_FILE" || true)"
 
+if [[ "$PERSIST" -eq 1 && -z "$RESUME_ID" && -z "$SESSION_ID" ]]; then
+  echo "Warning: no 'session id:' line in ${LOG_FILE}; this session was NOT recorded in the ledger." >&2
+fi
 if [[ "$PERSIST" -eq 1 && -z "$RESUME_ID" && -n "$SESSION_ID" ]]; then
   LEDGER_MODE="persist"
   [[ "$WORKTREE" -eq 1 ]] && LEDGER_MODE="worktree"

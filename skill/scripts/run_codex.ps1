@@ -4,7 +4,7 @@ param(
     [string]$Model = $(if ($env:CODEX_WHIP_DEFAULT_MODEL) { $env:CODEX_WHIP_DEFAULT_MODEL } else { "gpt-6.2-sol" }),
     [ValidateSet("low", "medium", "high", "xhigh")]
     [string]$Effort = $(if ($env:CODEX_WHIP_DEFAULT_EFFORT) { $env:CODEX_WHIP_DEFAULT_EFFORT } else { "high" }),
-    [int]$Timeout = $(if ($env:CODEX_WHIP_TIMEOUT) { [int]$env:CODEX_WHIP_TIMEOUT } else { 600 }),
+    [int]$Timeout = $(if ($env:CODEX_WHIP_TIMEOUT) { [int]$env:CODEX_WHIP_TIMEOUT } else { 570 }),
     [string]$Prompt = "",
     [string]$PromptFile = "",
     [string[]]$Image = @(),

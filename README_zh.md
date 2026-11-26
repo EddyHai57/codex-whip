@@ -45,7 +45,7 @@ flowchart LR
   - 里程碑任务 `--persist --label <名称>`，支持按名精确/唯一模糊续跑（自动恢复原目录），验完 `--delete <名称>` 或 `--cleanup-all` 一键清空。
 - **大改动隔离（`--worktree`）**：自动开启 `--persist` 并吐出 `codex_workdir`，改在独立 Git worktree 里，主 Agent 审完 diff 再合回主工作区。
 - **封顶 2 轮独立 Review**：强制全新无状态 `sol` 审 diff，只报 Blocker/Major 缺陷，最多 2 轮，防鸡蛋里挑骨头循环。
-- **内置护栏与成本观测**：进程组级 `--timeout`（默认 `600s`，超时退出码 `124`）、每次自动汇报 `codex_duration_sec` 和 `codex_tokens`、支持多张 `--image` 原图直传、一键弹出终端接管交互（`open_codex.sh` / `open_codex.ps1`）。
+- **内置护栏与成本观测**：进程组级 `--timeout`（默认 `570s`，低于 Claude Code 前台 Bash 的 600 秒上限；超时退出码 `124`）、每次自动汇报 `codex_duration_sec` 和 `codex_tokens`、支持多张 `--image` 原图直传、一键弹出终端接管交互（`open_codex.sh` / `open_codex.ps1`）。
 - **全平台支持**：macOS / Linux（Bash + Python 3）与 Windows（PowerShell，UTF-8 无乱码，免管理员权限目录联接安装）。
 
 ---
@@ -53,7 +53,10 @@ flowchart LR
 ## 3 步快速上手
 
 ### 前置条件
-- 本机已安装并登录 [OpenAI Codex CLI](https://github.com/openai/codex)（脚本自动探测 `PATH`、macOS ChatGPT 桌面端内置路径，也支持 `CODEX_BIN` 环境变量）。
+- **本机 OpenAI Codex CLI**（[openai/codex](https://github.com/openai/codex)），已安装并登录（`codex login`）。脚本直接调用 `codex exec` / `codex exec resume`，不走 Codex API，也不需要 MCP 服务。自动探测 `PATH`、macOS ChatGPT 桌面端内置路径，也支持 `CODEX_BIN` 环境变量。
+  - 依赖的参数：`exec --output-schema -o --ephemeral --worktree -s --cd --color`、`exec resume -c -m -i`、`delete --force`、`archive`。最近一次验证版本 `codex-cli 0.171.0-alpha`，新版 CLI 可能改名。
+  - 默认模型 `gpt-6.2-sol` / `gpt-6.2-astra` 需在你的账号下可用；否则用 `--model <id>` 或 `CODEX_WHIP_DEFAULT_MODEL` 改。
+- `bash` 与 `python3`（macOS / Linux），或 PowerShell 5.1+（Windows）。
 - Google Antigravity 和/或 Claude Code。
 
 ### 安装（macOS / Linux）

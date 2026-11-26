@@ -45,7 +45,7 @@ flowchart LR
   - Milestones run `--persist --label <name>`, resume by name/UUID (auto-restoring workdir), and clean up via `--delete <name>` or `--cleanup-all`.
 - **Safe Isolation (`--worktree`)**: Automatically implies `--persist` and prints `codex_workdir` so your main agent can audit `git diff` in an isolated worktree before touching your working tree.
 - **Capped 2-Round Independent Review**: Fresh ephemeral `sol` reviewer, Blocker/Major findings only, hard cap at 2 rounds to stop nitpick loops.
-- **Built-in Guardrails & Telemetry**: Process-group `--timeout` (default `600s`, exit `124`), `codex_duration_sec` & `codex_tokens` per run, repeatable `--image` forwarding, and one-command interactive takeover (`open_codex.sh` / `open_codex.ps1`).
+- **Built-in Guardrails & Telemetry**: Process-group `--timeout` (default `570s`, under Claude Code's 600 s Bash cap; exit `124`), `codex_duration_sec` & `codex_tokens` per run, repeatable `--image` forwarding, and one-command interactive takeover (`open_codex.sh` / `open_codex.ps1`).
 - **Cross-Platform**: macOS / Linux (`bash` + `python3`) and Windows (`PowerShell`, UTF-8 clean, non-admin Junction install).
 
 ---
@@ -53,7 +53,10 @@ flowchart LR
 ## Quick Start
 
 ### Prerequisites
-- Local [OpenAI Codex CLI](https://github.com/openai/codex) installed and signed in (auto-detected from `PATH`, macOS ChatGPT Desktop bundle, or `CODEX_BIN`).
+- **Local OpenAI Codex CLI** ([openai/codex](https://github.com/openai/codex)), installed and signed in (`codex login`). The wrapper shells out to `codex exec` / `codex exec resume`; it does not use the Codex API or an MCP server. Auto-detected from `PATH`, the macOS ChatGPT Desktop bundle, or `CODEX_BIN`.
+  - Flags relied on: `exec --output-schema -o --ephemeral --worktree -s --cd --color`, `exec resume -c -m -i`, `delete --force`, `archive`. Last verified with `codex-cli 0.171.0-alpha`; newer CLIs may rename flags.
+  - The default models `gpt-6.2-sol` / `gpt-6.2-astra` must be available on your account; override with `--model <id>` or `CODEX_WHIP_DEFAULT_MODEL`.
+- `bash` and `python3` (macOS / Linux), or PowerShell 5.1+ (Windows).
 - Google Antigravity and/or Claude Code.
 
 ### Install (macOS / Linux)
