@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["done", "partial", "blocked", "failed"]
+    },
+    "summary": {
+      "type": "string",
+      "description": "Concise, factual result in <= 5 sentences. No filler or conversational prose."
+    },
+    "files_changed": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Paths of files created, modified, or deleted. Empty array if none."
+    },
+    "checks": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Verification commands or tests executed and their exact pass/fail outcome."
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Key file:line citations or paths to detailed report files written to disk."
+    },
+    "risks_or_open_questions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Caveats, assumptions, blockers, or edge cases. Empty array if none."
+    }
+  },
+  "required": [
+    "status",
+    "summary",
+    "files_changed",
+    "checks",
+    "evidence_refs",
+    "risks_or_open_questions"
+  ]
+}
